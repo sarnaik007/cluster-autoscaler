@@ -767,7 +767,11 @@ func (a *StaticAutoscaler) removeOldUnregisteredNodes(allUnregisteredNodes []clu
 		}
 
 		if unregisteredNode.UnregisteredSince.Add(maxNodeProvisionTime).Before(currentTime) {
-			klog.V(0).Infof("Marking unregistered node %v for removal", unregisteredNode.Node.Name)
+			klog.V(0).Infof("Marking unregistered node %v for removal, because node times out", unregisteredNode.Node.Name)
+			nodesToBeDeletedByNodeGroupId[nodeGroup.Id()] = append(nodesToBeDeletedByNodeGroupId[nodeGroup.Id()], unregisteredNode)
+		}
+		if clusterstate.IsFakeNodeUnhealthy(unregisteredNode.Node) {
+			klog.V(0).Infof("Marking unregistered node %v for removal, because node is unhealthy", unregisteredNode.Node.Name)
 			nodesToBeDeletedByNodeGroupId[nodeGroup.Id()] = append(nodesToBeDeletedByNodeGroupId[nodeGroup.Id()], unregisteredNode)
 		}
 	}
