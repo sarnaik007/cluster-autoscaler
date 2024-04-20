@@ -28,7 +28,7 @@ import (
 	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/recommender/input"
 	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/recommender/logic"
 	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/recommender/model"
-	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/target/controller_fetcher"
+	controllerfetcher "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/target/controller_fetcher"
 	metrics_recommender "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/utils/metrics/recommender"
 	vpa_utils "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/utils/vpa"
 )
@@ -157,8 +157,14 @@ func (r *recommender) RunOnce() {
 	r.clusterStateFeeder.LoadVPAs()
 	timer.ObserveStep("LoadVPAs")
 
+	r.clusterStateFeeder.MarkAggregates()
+	timer.ObserveStep("MarkAggregates")
+
 	r.clusterStateFeeder.LoadPods()
 	timer.ObserveStep("LoadPods")
+
+	r.clusterStateFeeder.SweepAggregates()
+	timer.ObserveStep("SweepAggregates")
 
 	r.clusterStateFeeder.LoadRealTimeMetrics()
 	timer.ObserveStep("LoadMetrics")
