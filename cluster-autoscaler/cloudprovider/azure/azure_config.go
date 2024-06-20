@@ -265,8 +265,9 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 	return cfg, nil
 }
 
-// A "fork" of az.getAzureClientConfig with BYO authorizer (e.g., for CLI auth) support
+// A "fork" of az.getAzureClientConfig with BYO authorizer (e.g., for CLI auth) and custom polling delay support
 func (cfg *Config) getAzureClientConfig(authorizer autorest.Authorizer, env *azure.Environment) *azclients.ClientConfig {
+	pollingDelay := 30 * time.Second
 	azClientConfig := &azclients.ClientConfig{
 		CloudName:               cfg.Cloud,
 		Location:                cfg.Location,
@@ -274,8 +275,11 @@ func (cfg *Config) getAzureClientConfig(authorizer autorest.Authorizer, env *azu
 		ResourceManagerEndpoint: env.ResourceManagerEndpoint,
 		Authorizer:              authorizer,
 		Backoff:                 &retry.Backoff{Steps: 1},
-		DisableAzureStackCloud:  cfg.DisableAzureStackCloud,
-		UserAgent:               cfg.UserAgent,
+		RestClientConfig: azclients.RestClientConfig{
+			PollingDelay: &pollingDelay,
+		},
+		DisableAzureStackCloud: cfg.DisableAzureStackCloud,
+		UserAgent:              cfg.UserAgent,
 	}
 
 	if cfg.CloudProviderBackoff {
