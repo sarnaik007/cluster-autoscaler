@@ -54,7 +54,7 @@ type AzureManager struct {
 	explicitlyConfigured map[string]bool
 }
 
-// createAzureManagerInternal allows for a custom azClient to be passed in by tests.
+// createAzureManagerInternal allows for a custom azureClients to be passed in by tests.
 func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovider.NodeGroupDiscoveryOptions, azureClients *azureClients) (*AzureManager, error) {
 	cfg, err := BuildAzureConfig(configReader)
 	if err != nil {
