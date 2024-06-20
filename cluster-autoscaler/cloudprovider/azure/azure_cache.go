@@ -46,7 +46,7 @@ var (
 type azureCache struct {
 	mutex           sync.Mutex
 	interrupt       chan struct{}
-	azureClients    *azureClients
+	azClient        *azClient
 	refreshInterval time.Duration
 
 	// Cache content.
@@ -62,10 +62,10 @@ type azureCache struct {
 	skus                 map[string]*skewer.Cache
 }
 
-func newAzureCache(client *azureClients, cacheTTL time.Duration, resourceGroup, vmType string, enableDynamicInstanceList bool, defaultLocation string) (*azureCache, error) {
+func newAzureCache(client *azClient, cacheTTL time.Duration, resourceGroup, vmType string, enableDynamicInstanceList bool, defaultLocation string) (*azureCache, error) {
 	cache := &azureCache{
 		interrupt:            make(chan struct{}),
-		azureClients:         client,
+		azClient:             client,
 		refreshInterval:      cacheTTL,
 		resourceGroup:        resourceGroup,
 		vmType:               vmType,
@@ -207,7 +207,7 @@ func (m *azureCache) fetchVirtualMachines() (map[string][]compute.VirtualMachine
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	result, err := m.azureClients.virtualMachinesClient.List(ctx, m.resourceGroup)
+	result, err := m.azClient.virtualMachinesClient.List(ctx, m.resourceGroup)
 	if err != nil {
 		klog.Errorf("VirtualMachinesClient.List in resource group %q failed: %v", m.resourceGroup, err)
 		return nil, nil, err.Error()
@@ -253,7 +253,7 @@ func (m *azureCache) fetchScaleSets() (map[string]compute.VirtualMachineScaleSet
 	ctx, cancel := getContextWithTimeout(vmssContextTimeout)
 	defer cancel()
 
-	result, err := m.azureClients.virtualMachineScaleSetsClient.List(ctx, m.resourceGroup)
+	result, err := m.azClient.virtualMachineScaleSetsClient.List(ctx, m.resourceGroup)
 	if err != nil {
 		klog.Errorf("VirtualMachineScaleSetsClient.List in resource group %q failed: %v", m.resourceGroup, err)
 		return nil, err.Error()
@@ -318,7 +318,7 @@ func (m *azureCache) Unregister(nodeGroup cloudprovider.NodeGroup) bool {
 func (m *azureCache) fetchSKUs(ctx context.Context, location string) (*skewer.Cache, error) {
 	return skewer.NewCache(ctx,
 		skewer.WithLocation(location),
-		skewer.WithResourceClient(m.azureClients.skuClient),
+		skewer.WithResourceClient(m.azClient.skuClient),
 	)
 }
 

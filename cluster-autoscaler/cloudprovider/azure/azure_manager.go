@@ -44,9 +44,9 @@ const (
 
 // AzureManager handles Azure communication and data caching.
 type AzureManager struct {
-	config       *Config
-	azureClients *azureClients
-	env          azure.Environment
+	config   *Config
+	azClient *azClient
+	env      azure.Environment
 
 	azureCache           *azureCache
 	lastRefresh          time.Time
@@ -54,8 +54,8 @@ type AzureManager struct {
 	explicitlyConfigured map[string]bool
 }
 
-// createAzureManagerInternal allows for a custom azureClients to be passed in by tests.
-func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovider.NodeGroupDiscoveryOptions, azureClients *azureClients) (*AzureManager, error) {
+// createAzureManagerInternal allows for a custom azClient to be passed in by tests.
+func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovider.NodeGroupDiscoveryOptions, azClient *azClient) (*AzureManager, error) {
 	cfg, err := BuildAzureConfig(configReader)
 	if err != nil {
 		return nil, err
@@ -72,8 +72,8 @@ func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovi
 
 	klog.Infof("Starting azure manager with subscription ID %q", cfg.SubscriptionID)
 
-	if azureClients == nil {
-		azureClients, err = newAzureClients(cfg, &env)
+	if azClient == nil {
+		azClient, err = newAzClient(cfg, &env)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovi
 	manager := &AzureManager{
 		config:               cfg,
 		env:                  env,
-		azureClients:         azureClients,
+		azClient:             azClient,
 		explicitlyConfigured: make(map[string]bool),
 	}
 
@@ -91,7 +91,7 @@ func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovi
 	if cfg.VmssCacheTTLInSeconds != 0 {
 		cacheTTL = time.Duration(cfg.VmssCacheTTLInSeconds) * time.Second
 	}
-	cache, err := newAzureCache(azureClients, cacheTTL, cfg.ResourceGroup, cfg.VMType, cfg.EnableDynamicInstanceList, cfg.Location)
+	cache, err := newAzureCache(azClient, cacheTTL, cfg.ResourceGroup, cfg.VMType, cfg.EnableDynamicInstanceList, cfg.Location)
 	if err != nil {
 		return nil, err
 	}

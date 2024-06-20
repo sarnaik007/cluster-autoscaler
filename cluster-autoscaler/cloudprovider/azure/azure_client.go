@@ -159,7 +159,7 @@ func newAgentpoolClientWithPublicEndpoint(cfg *Config, retryOptions azurecore_po
 	return newAgentpoolClientWithConfig(cfg.SubscriptionID, cred, env.ResourceManagerEndpoint, env.TokenAudience, retryOptions)
 }
 
-type azureClients struct {
+type azClient struct {
 	virtualMachineScaleSetsClient   vmssclient.Interface
 	virtualMachineScaleSetVMsClient vmssvmclient.Interface
 	virtualMachinesClient           vmclient.Interface
@@ -186,7 +186,7 @@ func newAuthorizer(config *Config, env *azure.Environment) (autorest.Authorizer,
 	}
 }
 
-func newAzureClients(cfg *Config, env *azure.Environment) (*azureClients, error) {
+func newAzClient(cfg *Config, env *azure.Environment) (*azClient, error) {
 	authorizer, err := newAuthorizer(cfg, env)
 	if err != nil {
 		return nil, err
@@ -236,7 +236,7 @@ func newAzureClients(cfg *Config, env *azure.Environment) (*azureClients, error)
 		klog.Warningf("newAgentpoolClient failed with error: %s", err)
 	}
 
-	return &azureClients{
+	return &azClient{
 		disksClient:                     disksClient,
 		interfacesClient:                interfacesClient,
 		virtualMachineScaleSetsClient:   scaleSetsClient,
