@@ -66,6 +66,10 @@ type CloudProviderRateLimitConfig struct {
 type Config struct {
 	providerazure.Config `json:",inline" yaml:",inline"`
 
+	ClusterName string `json:"clusterName" yaml:"clusterName"`
+	// ClusterResourceGroup is the resource group where the cluster is located.
+	ClusterResourceGroup string `json:"clusterResourceGroup" yaml:"clusterResourceGroup"`
+
 	// ARMBaseURLForAPClient is the URL to use for operations for the VMs pool.
 	// It can override the default public ARM endpoint for VMs pool scale operations.
 	ARMBaseURLForAPClient string `json:"armBaseURLForAPClient" yaml:"armBaseURLForAPClient"`
