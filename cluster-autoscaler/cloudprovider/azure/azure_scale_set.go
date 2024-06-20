@@ -92,8 +92,8 @@ func NewScaleSet(spec *dynamic.NodeGroupSpec, az *AzureManager, curSize int64) (
 		enableForceDelete:         az.config.EnableForceDelete,
 	}
 
-	if az.config.VmssVmsCacheTTL != 0 {
-		scaleSet.instancesRefreshPeriod = time.Duration(az.config.VmssVmsCacheTTL) * time.Second
+	if az.config.VmssVirtualMachinesCacheTTLInSeconds != 0 {
+		scaleSet.instancesRefreshPeriod = time.Duration(az.config.VmssVirtualMachinesCacheTTLInSeconds) * time.Second
 	} else {
 		scaleSet.instancesRefreshPeriod = defaultVmssInstancesRefreshPeriod
 	}
@@ -585,7 +585,7 @@ func (scaleSet *ScaleSet) Nodes() ([]cloudprovider.Instance, error) {
 		}
 
 	} else if orchestrationMode == compute.Flexible {
-		if scaleSet.manager.config.EnableVmssFlex {
+		if scaleSet.manager.config.EnableVmssFlexNodes {
 			err := scaleSet.buildScaleSetCacheForFlex(lastRefresh)
 			if err != nil {
 				return nil, err
