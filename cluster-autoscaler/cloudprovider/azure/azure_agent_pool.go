@@ -82,10 +82,10 @@ func (as *AgentPool) initialize() error {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	template, err := as.manager.azClient.deploymentsClient.ExportTemplate(ctx, as.manager.config.ResourceGroup, as.manager.config.Deployment)
+	template, err := as.manager.azureClients.deploymentClient.ExportTemplate(ctx, as.manager.config.ResourceGroup, as.manager.config.Deployment)
 	if err != nil {
-		klog.Errorf("deploymentsClient.ExportTemplate(%s, %s) failed: %v", as.manager.config.ResourceGroup, as.manager.config.Deployment, err)
-		return err
+		klog.Errorf("deploymentClient.ExportTemplate(%s, %s) failed: %v", as.manager.config.ResourceGroup, as.manager.config.Deployment, err)
+		return err.Error()
 	}
 
 	as.template = template.Template.(map[string]interface{})
@@ -211,18 +211,24 @@ func (as *AgentPool) TargetSize() (int, error) {
 	return int(size), nil
 }
 
-func (as *AgentPool) getAllSucceededAndFailedDeployments() (succeededAndFailedDeployments []resources.DeploymentExtended, err error) {
+func (as *AgentPool) getAllSucceededAndFailedDeployments() ([]resources.DeploymentExtended, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	deploymentsFilter := "provisioningState eq 'Succeeded' or provisioningState eq 'Failed'"
-	succeededAndFailedDeployments, err = as.manager.azClient.deploymentsClient.List(ctx, as.manager.config.ResourceGroup, deploymentsFilter, nil)
+	allDeployments, err := as.manager.azureClients.deploymentClient.List(ctx, as.manager.config.ResourceGroup)
 	if err != nil {
-		klog.Errorf("getAllSucceededAndFailedDeployments: failed to list succeeded or failed deployments with error: %v", err)
-		return nil, err
+		klog.Errorf("getAllSucceededAndFailedDeployments: failed to list deployments with error: %v", err)
+		return nil, err.Error()
 	}
 
-	return succeededAndFailedDeployments, err
+	result := make([]resources.DeploymentExtended, 0)
+	for _, deployment := range allDeployments {
+		if *deployment.Properties.ProvisioningState == "Succeeded" || *deployment.Properties.ProvisioningState == "Failed" {
+			result = append(result, deployment)
+		}
+	}
+
+	return result, err.Error()
 }
 
 // deleteOutdatedDeployments keeps the newest deployments in the resource group and delete others,
@@ -258,9 +264,9 @@ func (as *AgentPool) deleteOutdatedDeployments() (err error) {
 	errList := make([]error, 0)
 	for _, deployment := range toBeDeleted {
 		klog.V(4).Infof("deleteOutdatedDeployments: starts deleting outdated deployment (%s)", *deployment.Name)
-		_, err := as.manager.azClient.deploymentsClient.Delete(ctx, as.manager.config.ResourceGroup, *deployment.Name)
+		err := as.manager.azureClients.deploymentClient.Delete(ctx, as.manager.config.ResourceGroup, *deployment.Name)
 		if err != nil {
-			errList = append(errList, err)
+			errList = append(errList, err.Error())
 		}
 	}
 
@@ -317,22 +323,20 @@ func (as *AgentPool) IncreaseSize(delta int) error {
 	}
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	klog.V(3).Infof("Waiting for deploymentsClient.CreateOrUpdate(%s, %s, %v)", as.manager.config.ResourceGroup, newDeploymentName, newDeployment)
-	resp, err := as.manager.azClient.deploymentsClient.CreateOrUpdate(ctx, as.manager.config.ResourceGroup, newDeploymentName, newDeployment)
-	isSuccess, realError := isSuccessHTTPResponse(resp, err)
-	if isSuccess {
-		klog.V(3).Infof("deploymentsClient.CreateOrUpdate(%s, %s, %v) success", as.manager.config.ResourceGroup, newDeploymentName, newDeployment)
-
-		// Update cache after scale success.
-		as.curSize = int64(expectedSize)
-		as.lastRefresh = time.Now()
-		klog.V(6).Info("IncreaseSize: invalidating cache")
-		as.manager.invalidateCache()
-		return nil
+	klog.V(3).Infof("Waiting for deploymentClient.CreateOrUpdate(%s, %s, %v)", as.manager.config.ResourceGroup, newDeploymentName, newDeployment)
+	retryErr := as.manager.azureClients.deploymentClient.CreateOrUpdate(ctx, as.manager.config.ResourceGroup, newDeploymentName, newDeployment, "")
+	if err != nil {
+		klog.Errorf("deploymentClient.CreateOrUpdate for deployment %q failed: %v", newDeploymentName, retryErr)
+		return retryErr.Error()
 	}
+	klog.V(3).Infof("deploymentClient.CreateOrUpdate(%s, %s, %v) success", as.manager.config.ResourceGroup, newDeploymentName, newDeployment)
 
-	klog.Errorf("deploymentsClient.CreateOrUpdate for deployment %q failed: %v", newDeploymentName, realError)
-	return realError
+	// Update cache after scale success.
+	as.curSize = int64(expectedSize)
+	as.lastRefresh = time.Now()
+	klog.V(6).Info("IncreaseSize: invalidating cache")
+	as.manager.invalidateCache()
+	return nil
 }
 
 // AtomicIncreaseSize is not implemented.
@@ -503,7 +507,7 @@ func (as *AgentPool) deleteBlob(accountName, vhdContainer, vhdBlob string) error
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	storageKeysResult, rerr := as.manager.azClient.storageAccountsClient.ListKeys(ctx, as.manager.config.SubscriptionID, as.manager.config.ResourceGroup, accountName)
+	storageKeysResult, rerr := as.manager.azureClients.storageAccountsClient.ListKeys(ctx, as.manager.config.SubscriptionID, as.manager.config.ResourceGroup, accountName)
 	if rerr != nil {
 		return rerr.Error()
 	}
@@ -526,7 +530,7 @@ func (as *AgentPool) deleteVirtualMachine(name string) error {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	vm, rerr := as.manager.azClient.virtualMachinesClient.Get(ctx, as.manager.config.ResourceGroup, name, "")
+	vm, rerr := as.manager.azureClients.virtualMachinesClient.Get(ctx, as.manager.config.ResourceGroup, name, "")
 	if rerr != nil {
 		if exists, _ := checkResourceExistsFromRetryError(rerr); !exists {
 			klog.V(2).Infof("VirtualMachine %s/%s has already been removed", as.manager.config.ResourceGroup, name)
@@ -562,7 +566,7 @@ func (as *AgentPool) deleteVirtualMachine(name string) error {
 	defer deleteCancel()
 
 	klog.Infof("waiting for VirtualMachine deletion: %s/%s", as.manager.config.ResourceGroup, name)
-	rerr = as.manager.azClient.virtualMachinesClient.Delete(deleteCtx, as.manager.config.ResourceGroup, name)
+	rerr = as.manager.azureClients.virtualMachinesClient.Delete(deleteCtx, as.manager.config.ResourceGroup, name)
 	_, realErr := checkResourceExistsFromRetryError(rerr)
 	if realErr != nil {
 		return realErr
@@ -573,7 +577,7 @@ func (as *AgentPool) deleteVirtualMachine(name string) error {
 		klog.Infof("deleting nic: %s/%s", as.manager.config.ResourceGroup, nicName)
 		interfaceCtx, interfaceCancel := getContextWithCancel()
 		defer interfaceCancel()
-		rerr := as.manager.azClient.interfacesClient.Delete(interfaceCtx, as.manager.config.ResourceGroup, nicName)
+		rerr := as.manager.azureClients.interfacesClient.Delete(interfaceCtx, as.manager.config.ResourceGroup, nicName)
 		klog.Infof("waiting for nic deletion: %s/%s", as.manager.config.ResourceGroup, nicName)
 		_, realErr := checkResourceExistsFromRetryError(rerr)
 		if realErr != nil {
@@ -605,7 +609,7 @@ func (as *AgentPool) deleteVirtualMachine(name string) error {
 			klog.Infof("deleting managed disk: %s/%s", as.manager.config.ResourceGroup, *osDiskName)
 			disksCtx, disksCancel := getContextWithCancel()
 			defer disksCancel()
-			rerr := as.manager.azClient.disksClient.Delete(disksCtx, as.manager.config.SubscriptionID, as.manager.config.ResourceGroup, *osDiskName)
+			rerr := as.manager.azureClients.disksClient.Delete(disksCtx, as.manager.config.SubscriptionID, as.manager.config.ResourceGroup, *osDiskName)
 			_, realErr := checkResourceExistsFromRetryError(rerr)
 			if realErr != nil {
 				return realErr

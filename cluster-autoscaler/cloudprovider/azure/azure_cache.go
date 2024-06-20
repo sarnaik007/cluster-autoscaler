@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/Azure/skewer"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+	providerazureconsts "sigs.k8s.io/cloud-provider-azure/pkg/consts"
 
 	"k8s.io/klog/v2"
 )
@@ -45,7 +46,7 @@ var (
 type azureCache struct {
 	mutex           sync.Mutex
 	interrupt       chan struct{}
-	azClient        *azClient
+	azClient        *azureClients
 	refreshInterval time.Duration
 
 	// Cache content.
@@ -61,7 +62,7 @@ type azureCache struct {
 	skus                 map[string]*skewer.Cache
 }
 
-func newAzureCache(client *azClient, cacheTTL time.Duration, resourceGroup, vmType string, enableDynamicInstanceList bool, defaultLocation string) (*azureCache, error) {
+func newAzureCache(client *azureClients, cacheTTL time.Duration, resourceGroup, vmType string, enableDynamicInstanceList bool, defaultLocation string) (*azureCache, error) {
 	cache := &azureCache{
 		interrupt:            make(chan struct{}),
 		azClient:             client,
@@ -374,7 +375,7 @@ func (m *azureCache) FindForInstance(instance *azureRef, vmType string) (cloudpr
 	}
 
 	// cluster with vmss pool only
-	if vmType == vmTypeVMSS && len(vmsPoolSet) == 0 {
+	if vmType == providerazureconsts.VMTypeVMSS && len(vmsPoolSet) == 0 {
 		if m.areAllScaleSetsUniform() {
 			// Omit virtual machines not managed by vmss only in case of uniform scale set.
 			if ok := virtualMachineRE.Match([]byte(inst.Name)); ok {
@@ -385,7 +386,7 @@ func (m *azureCache) FindForInstance(instance *azureRef, vmType string) (cloudpr
 		}
 	}
 
-	if vmType == vmTypeStandard {
+	if vmType == providerazureconsts.VMTypeStandard {
 		// Omit virtual machines with providerID not in Azure resource ID format.
 		if ok := virtualMachineRE.Match([]byte(inst.Name)); !ok {
 			klog.V(3).Infof("Instance %q is not in Azure resource ID format, omit it in autoscaler", instance.Name)

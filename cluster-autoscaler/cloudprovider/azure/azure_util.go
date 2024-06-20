@@ -113,7 +113,7 @@ func (util *AzUtil) DeleteBlob(accountName, vhdContainer, vhdBlob string) error 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	storageKeysResult, rerr := util.manager.azClient.storageAccountsClient.ListKeys(ctx, util.manager.config.SubscriptionID, util.manager.config.ResourceGroup, accountName)
+	storageKeysResult, rerr := util.manager.azureClients.storageAccountsClient.ListKeys(ctx, util.manager.config.SubscriptionID, util.manager.config.ResourceGroup, accountName)
 	if rerr != nil {
 		return rerr.Error()
 	}
@@ -136,7 +136,7 @@ func (util *AzUtil) DeleteVirtualMachine(rg string, name string) error {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	vm, rerr := util.manager.azClient.virtualMachinesClient.Get(ctx, rg, name, "")
+	vm, rerr := util.manager.azureClients.virtualMachinesClient.Get(ctx, rg, name, "")
 	if rerr != nil {
 		if exists, _ := checkResourceExistsFromRetryError(rerr); !exists {
 			klog.V(2).Infof("VirtualMachine %s/%s has already been removed", rg, name)
@@ -173,7 +173,7 @@ func (util *AzUtil) DeleteVirtualMachine(rg string, name string) error {
 	defer deleteCancel()
 
 	klog.Infof("waiting for VirtualMachine deletion: %s/%s", rg, name)
-	rerr = util.manager.azClient.virtualMachinesClient.Delete(deleteCtx, rg, name)
+	rerr = util.manager.azureClients.virtualMachinesClient.Delete(deleteCtx, rg, name)
 	_, realErr := checkResourceExistsFromRetryError(rerr)
 	if realErr != nil {
 		return realErr
@@ -185,7 +185,7 @@ func (util *AzUtil) DeleteVirtualMachine(rg string, name string) error {
 		interfaceCtx, interfaceCancel := getContextWithCancel()
 		defer interfaceCancel()
 		klog.Infof("waiting for nic deletion: %s/%s", rg, nicName)
-		nicErr := util.manager.azClient.interfacesClient.Delete(interfaceCtx, rg, nicName)
+		nicErr := util.manager.azureClients.interfacesClient.Delete(interfaceCtx, rg, nicName)
 		_, realErr := checkResourceExistsFromRetryError(nicErr)
 		if realErr != nil {
 			return realErr
@@ -216,7 +216,7 @@ func (util *AzUtil) DeleteVirtualMachine(rg string, name string) error {
 			klog.Infof("deleting managed disk: %s/%s", rg, *osDiskName)
 			disksCtx, disksCancel := getContextWithCancel()
 			defer disksCancel()
-			diskErr := util.manager.azClient.disksClient.Delete(disksCtx, util.manager.config.SubscriptionID, rg, *osDiskName)
+			diskErr := util.manager.azureClients.disksClient.Delete(disksCtx, util.manager.config.SubscriptionID, rg, *osDiskName)
 			_, realErr := checkResourceExistsFromRetryError(diskErr)
 			if realErr != nil {
 				return realErr
@@ -646,4 +646,22 @@ func vmPowerStateFromStatuses(statuses []compute.InstanceViewStatus) string {
 
 	// PowerState is not set if the VM is still creating (or has failed creation)
 	return vmPowerStateUnknown
+}
+
+// strconv.ParseInt, but for int
+func parseInt32(s string, base int) (int, error) {
+	val, err := strconv.ParseInt(s, base, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int(val), nil
+}
+
+// strconv.ParseFloat, but for float32
+func parseFloat32(s string, base float32) (float32, error) {
+	val, err := strconv.ParseFloat(s, 32)
+	if err != nil {
+		return 0, err
+	}
+	return float32(val), nil
 }

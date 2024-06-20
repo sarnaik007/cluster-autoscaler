@@ -32,13 +32,11 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/config/dynamic"
 	kretry "k8s.io/client-go/util/retry"
 	klog "k8s.io/klog/v2"
+	providerazureconsts "sigs.k8s.io/cloud-provider-azure/pkg/consts"
 	"sigs.k8s.io/cloud-provider-azure/pkg/retry"
 )
 
 const (
-	vmTypeVMSS     = "vmss"
-	vmTypeStandard = "standard"
-
 	scaleToZeroSupportedStandard = false
 	scaleToZeroSupportedVMSS     = true
 	refreshInterval              = 1 * time.Minute
@@ -46,9 +44,9 @@ const (
 
 // AzureManager handles Azure communication and data caching.
 type AzureManager struct {
-	config   *Config
-	azClient *azClient
-	env      azure.Environment
+	config       *Config
+	azureClients *azureClients
+	env          azure.Environment
 
 	azureCache           *azureCache
 	lastRefresh          time.Time
@@ -57,7 +55,7 @@ type AzureManager struct {
 }
 
 // createAzureManagerInternal allows for a custom azClient to be passed in by tests.
-func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovider.NodeGroupDiscoveryOptions, azClient *azClient) (*AzureManager, error) {
+func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovider.NodeGroupDiscoveryOptions, azureClients *azureClients) (*AzureManager, error) {
 	cfg, err := BuildAzureConfig(configReader)
 	if err != nil {
 		return nil, err
@@ -74,8 +72,8 @@ func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovi
 
 	klog.Infof("Starting azure manager with subscription ID %q", cfg.SubscriptionID)
 
-	if azClient == nil {
-		azClient, err = newAzClient(cfg, &env)
+	if azureClients == nil {
+		azureClients, err = newAzureClients(cfg, &env)
 		if err != nil {
 			return nil, err
 		}
@@ -85,15 +83,15 @@ func createAzureManagerInternal(configReader io.Reader, discoveryOpts cloudprovi
 	manager := &AzureManager{
 		config:               cfg,
 		env:                  env,
-		azClient:             azClient,
+		azureClients:         azureClients,
 		explicitlyConfigured: make(map[string]bool),
 	}
 
 	cacheTTL := refreshInterval
-	if cfg.VmssCacheTTL != 0 {
-		cacheTTL = time.Duration(cfg.VmssCacheTTL) * time.Second
+	if cfg.VmssCacheTTLInSeconds != 0 {
+		cacheTTL = time.Duration(cfg.VmssCacheTTLInSeconds) * time.Second
 	}
-	cache, err := newAzureCache(azClient, cacheTTL, cfg.ResourceGroup, cfg.VMType, cfg.EnableDynamicInstanceList, cfg.Location)
+	cache, err := newAzureCache(azureClients, cacheTTL, cfg.ResourceGroup, cfg.VMType, cfg.EnableDynamicInstanceList, cfg.Location)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +151,7 @@ func (m *AzureManager) fetchExplicitNodeGroups(specs []string) error {
 
 func (m *AzureManager) buildNodeGroupFromSpec(spec string) (cloudprovider.NodeGroup, error) {
 	scaleToZeroSupported := scaleToZeroSupportedStandard
-	if strings.EqualFold(m.config.VMType, vmTypeVMSS) {
+	if strings.EqualFold(m.config.VMType, providerazureconsts.VMTypeVMSS) {
 		scaleToZeroSupported = scaleToZeroSupportedVMSS
 	}
 	s, err := dynamic.SpecFromString(spec, scaleToZeroSupported)
@@ -167,9 +165,9 @@ func (m *AzureManager) buildNodeGroupFromSpec(spec string) (cloudprovider.NodeGr
 	}
 
 	switch m.config.VMType {
-	case vmTypeStandard:
+	case providerazureconsts.VMTypeStandard:
 		return NewAgentPool(s, m)
-	case vmTypeVMSS:
+	case providerazureconsts.VMTypeVMSS:
 		return NewScaleSet(s, m, -1)
 	default:
 		return nil, fmt.Errorf("vmtype %s not supported", m.config.VMType)
@@ -296,7 +294,7 @@ func (m *AzureManager) getFilteredNodeGroups(filter []labelAutoDiscoveryConfig) 
 		return nil, nil
 	}
 
-	if m.config.VMType == vmTypeVMSS {
+	if m.config.VMType == providerazureconsts.VMTypeVMSS {
 		return m.getFilteredScaleSets(filter)
 	}
 
