@@ -232,6 +232,11 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 
 	// Nonstatic defaults
 	cfg.VMType = strings.ToLower(cfg.VMType)
+	if cfg.MaxDeploymentsCount == 0 {
+		// 0 means "use default" in this case.
+		// This means, if it is valued by the config file, but explicitly set to 0 in the env, it will retreat to default.
+		cfg.MaxDeploymentsCount = int64(defaultMaxDeploymentsCount)
+	}
 	if cfg.SubscriptionID == "" {
 		metadataService, err := providerazure.NewInstanceMetadataService(imdsServerURL)
 		if err != nil {
@@ -354,7 +359,7 @@ func assignFromEnvIfExists(assignee *string, name string) (bool, error) {
 	if assignee == nil {
 		return false, fmt.Errorf("assignee is nil")
 	}
-	if val, present := os.LookupEnv(name); present {
+	if val, present := os.LookupEnv(name); present && strings.TrimSpace(val) != "" {
 		*assignee = strings.TrimSpace(val)
 		return true, nil
 	}
@@ -366,7 +371,7 @@ func assignBoolFromEnvIfExists(assignee *bool, name string) (bool, error) {
 		return false, fmt.Errorf("assignee is nil")
 	}
 	var err error
-	if val, present := os.LookupEnv(name); present {
+	if val, present := os.LookupEnv(name); present && strings.TrimSpace(val) != "" {
 		*assignee, err = strconv.ParseBool(val)
 		if err != nil {
 			return false, fmt.Errorf("failed to parse %s %q: %v", name, val, err)
@@ -381,7 +386,7 @@ func assignIntFromEnvIfExists(assignee *int, name string) (bool, error) {
 		return false, fmt.Errorf("assignee is nil")
 	}
 	var err error
-	if val, present := os.LookupEnv(name); present {
+	if val, present := os.LookupEnv(name); present && strings.TrimSpace(val) != "" {
 		*assignee, err = parseInt32(val, 10)
 		if err != nil {
 			return false, fmt.Errorf("failed to parse %s %q: %v", name, val, err)
@@ -396,7 +401,7 @@ func assignInt64FromEnvIfExists(assignee *int64, name string) (bool, error) {
 		return false, fmt.Errorf("assignee is nil")
 	}
 	var err error
-	if val, present := os.LookupEnv(name); present {
+	if val, present := os.LookupEnv(name); present && strings.TrimSpace(val) != "" {
 		*assignee, err = strconv.ParseInt(val, 10, 0)
 		if err != nil {
 			return false, fmt.Errorf("failed to parse %s %q: %v", name, val, err)
@@ -411,7 +416,7 @@ func assignFloat32FromEnvIfExists(assignee *float32, name string) (bool, error) 
 		return false, fmt.Errorf("assignee is nil")
 	}
 	var err error
-	if val, present := os.LookupEnv(name); present {
+	if val, present := os.LookupEnv(name); present && strings.TrimSpace(val) != "" {
 		*assignee, err = parseFloat32(val, 32)
 		if err != nil {
 			return false, fmt.Errorf("failed to parse %s %q: %v", name, val, err)
@@ -426,7 +431,7 @@ func assignFloat64FromEnvIfExists(assignee *float64, name string) (bool, error) 
 		return false, fmt.Errorf("assignee is nil")
 	}
 	var err error
-	if val, present := os.LookupEnv(name); present {
+	if val, present := os.LookupEnv(name); present && strings.TrimSpace(val) != "" {
 		*assignee, err = strconv.ParseFloat(val, 64)
 		if err != nil {
 			return false, fmt.Errorf("failed to parse %s %q: %v", name, val, err)
