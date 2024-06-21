@@ -125,6 +125,9 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 	if _, err = assignFromEnvIfExists(&cfg.ARMBaseURLForAPClient, "ARM_BASE_URL_FOR_AP_CLIENT"); err != nil {
 		return nil, err
 	}
+	if _, err = assignFromEnvIfExists(&cfg.Cloud, "ARM_CLOUD"); err != nil {
+		return nil, err
+	}
 	if _, err = assignFromEnvIfExists(&cfg.Location, "LOCATION"); err != nil {
 		return nil, err
 	}
@@ -186,6 +189,9 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 		return nil, err
 	}
 	if _, err = assignBoolFromEnvIfExists(&cfg.CloudProviderBackoff, "ENABLE_BACKOFF"); err != nil {
+		return nil, err
+	}
+	if _, err = assignBoolFromEnvIfExists(&cfg.EnableForceDelete, "AZURE_ENABLE_FORCE_DELETE"); err != nil {
 		return nil, err
 	}
 	if _, err = assignBoolFromEnvIfExists(&cfg.EnableDynamicInstanceList, "AZURE_ENABLE_DYNAMIC_INSTANCE_LIST"); err != nil {
@@ -314,6 +320,10 @@ func (cfg *Config) validate() error {
 
 	if cfg.UseManagedIdentityExtension && cfg.UseFederatedWorkloadIdentityExtension {
 		return fmt.Errorf("you can not combine both managed identity and workload identity as an authentication mechanism")
+	}
+
+	if cfg.VMType != providerazureconsts.VMTypeStandard && cfg.VMType != providerazureconsts.VMTypeVMSS {
+		return fmt.Errorf("unsupported VM type: %s", cfg.VMType)
 	}
 
 	if !cfg.UseManagedIdentityExtension && !cfg.UseFederatedWorkloadIdentityExtension {
