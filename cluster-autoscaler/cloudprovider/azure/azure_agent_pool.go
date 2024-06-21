@@ -223,6 +223,9 @@ func (as *AgentPool) getAllSucceededAndFailedDeployments() ([]resources.Deployme
 
 	result := make([]resources.DeploymentExtended, 0)
 	for _, deployment := range allDeployments {
+		if deployment.Properties == nil || deployment.Properties.ProvisioningState == nil {
+			continue
+		}
 		if *deployment.Properties.ProvisioningState == "Succeeded" || *deployment.Properties.ProvisioningState == "Failed" {
 			result = append(result, deployment)
 		}
