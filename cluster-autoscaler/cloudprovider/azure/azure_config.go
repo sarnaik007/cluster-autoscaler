@@ -48,22 +48,10 @@ const (
 	authMethodCLI       = "cli"
 )
 
-// CloudProviderRateLimitConfig indicates the rate limit config for each clients.
-type CloudProviderRateLimitConfig struct {
-	// The default rate limit config options.
-	azclients.RateLimitConfig
-
-	// Rate limit config for each clients. Values would override default settings above.
-	InterfaceRateLimit              *azclients.RateLimitConfig `json:"interfaceRateLimit,omitempty" yaml:"interfaceRateLimit,omitempty"`
-	VirtualMachineRateLimit         *azclients.RateLimitConfig `json:"virtualMachineRateLimit,omitempty" yaml:"virtualMachineRateLimit,omitempty"`
-	StorageAccountRateLimit         *azclients.RateLimitConfig `json:"storageAccountRateLimit,omitempty" yaml:"storageAccountRateLimit,omitempty"`
-	DiskRateLimit                   *azclients.RateLimitConfig `json:"diskRateLimit,omitempty" yaml:"diskRateLimit,omitempty"`
-	VirtualMachineScaleSetRateLimit *azclients.RateLimitConfig `json:"virtualMachineScaleSetRateLimit,omitempty" yaml:"virtualMachineScaleSetRateLimit,omitempty"`
-	KubernetesServiceRateLimit      *azclients.RateLimitConfig `json:"kubernetesServiceRateLimit,omitempty" yaml:"kubernetesServiceRateLimit,omitempty"`
-}
-
-// Config holds the configuration parsed from the --cloud-config flag
+// Config holds the configuration parsed from the --cloud-config flag or the environment variables.
+// Contains both general Azure cloud provider configuration (i.e., in azure.json) and CAS configurations/options specifically for Azure provider.
 type Config struct {
+	// Azure cloud provider configuration, which is generally shared with other Azure components.
 	providerazure.Config `json:",inline" yaml:",inline"`
 
 	ClusterName string `json:"clusterName" yaml:"clusterName"`
