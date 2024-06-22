@@ -67,6 +67,29 @@ const validAzureCfg = `{
 	}
 }`
 
+const validAzureCfgLegacy = `{
+	"cloud": "AzurePublicCloud",
+	"tenantId": "fakeId",
+	"subscriptionId": "fakeId",
+	"resourceGroup": "fakeId",
+	"location": "southeastasia",
+	"useWorkloadIdentityExtension": true,
+	"subnetName": "fakeName",
+	"securityGroupName": "fakeName",
+	"vnetName": "fakeName",
+	"routeTableName": "fakeName",
+	"primaryAvailabilitySetName": "fakeName",
+	"vmssCacheTTL": 60,
+	"vmssVmsCacheTTL": 240,
+	"vmssVmsCacheJitter": 120,
+	"maxDeploymentsCount": 8,
+	"cloudProviderRateLimit": false,
+	"routeRateLimit": {
+		"cloudProviderRateLimit": true,
+		"cloudProviderRateLimitQPS": 3
+	}
+}`
+
 const validAzureCfgForStandardVMType = `{
 	"cloud": "AzurePublicCloud",
 	"tenantId": "fakeId",
@@ -194,6 +217,89 @@ func TestCreateAzureManagerValidConfig(t *testing.T) {
 				AzureAuthConfig: azclient.AzureAuthConfig{
 					AADClientID:     "fakeId",
 					AADClientSecret: "fakeId",
+				},
+				SubscriptionID: "fakeId",
+			},
+			Location:                             "southeastasia",
+			ResourceGroup:                        "fakeId",
+			VMType:                               "vmss",
+			VmssCacheTTLInSeconds:                60,
+			VmssVirtualMachinesCacheTTLInSeconds: 240,
+			CloudProviderRateLimitConfig: providerazureconfig.CloudProviderRateLimitConfig{
+				RateLimitConfig: azclients.RateLimitConfig{
+					CloudProviderRateLimit:            false,
+					CloudProviderRateLimitBucket:      5,
+					CloudProviderRateLimitBucketWrite: 5,
+					CloudProviderRateLimitQPS:         1,
+					CloudProviderRateLimitQPSWrite:    1,
+				},
+				InterfaceRateLimit: &azclients.RateLimitConfig{
+					CloudProviderRateLimit:            false,
+					CloudProviderRateLimitBucket:      5,
+					CloudProviderRateLimitBucketWrite: 5,
+					CloudProviderRateLimitQPS:         1,
+					CloudProviderRateLimitQPSWrite:    1,
+				},
+				VirtualMachineRateLimit: &azclients.RateLimitConfig{
+					CloudProviderRateLimit:            false,
+					CloudProviderRateLimitBucket:      5,
+					CloudProviderRateLimitBucketWrite: 5,
+					CloudProviderRateLimitQPS:         1,
+					CloudProviderRateLimitQPSWrite:    1,
+				},
+				StorageAccountRateLimit: &azclients.RateLimitConfig{
+					CloudProviderRateLimit:            false,
+					CloudProviderRateLimitBucket:      5,
+					CloudProviderRateLimitBucketWrite: 5,
+					CloudProviderRateLimitQPS:         1,
+					CloudProviderRateLimitQPSWrite:    1,
+				},
+				DiskRateLimit: &azclients.RateLimitConfig{
+					CloudProviderRateLimit:            false,
+					CloudProviderRateLimitBucket:      5,
+					CloudProviderRateLimitBucketWrite: 5,
+					CloudProviderRateLimitQPS:         1,
+					CloudProviderRateLimitQPSWrite:    1,
+				},
+				VirtualMachineScaleSetRateLimit: &azclients.RateLimitConfig{
+					CloudProviderRateLimit:            false,
+					CloudProviderRateLimitBucket:      5,
+					CloudProviderRateLimitBucketWrite: 5,
+					CloudProviderRateLimitQPS:         1,
+					CloudProviderRateLimitQPSWrite:    1,
+				},
+			},
+		},
+		VmssVmsCacheJitter:  120,
+		MaxDeploymentsCount: 8,
+	}
+
+	assert.NoError(t, err)
+	assertStructsMinimallyEqual(t, *expectedConfig, *manager.config)
+}
+
+func TestCreateAzureManagerLegacyConfig(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockVMClient := mockvmclient.NewMockInterface(ctrl)
+	mockVMSSClient := mockvmssclient.NewMockInterface(ctrl)
+	mockVMSSClient.EXPECT().List(gomock.Any(), "fakeId").Return([]compute.VirtualMachineScaleSet{}, nil).Times(2)
+	mockVMClient.EXPECT().List(gomock.Any(), "fakeId").Return([]compute.VirtualMachine{}, nil).Times(2)
+	mockAzClient := &azClient{
+		virtualMachinesClient:         mockVMClient,
+		virtualMachineScaleSetsClient: mockVMSSClient,
+	}
+	manager, err := createAzureManagerInternal(strings.NewReader(validAzureCfgLegacy), cloudprovider.NodeGroupDiscoveryOptions{}, mockAzClient)
+
+	expectedConfig := &Config{
+		Config: providerazure.Config{
+			AzureAuthConfig: providerazureconfig.AzureAuthConfig{
+				ARMClientConfig: azclient.ARMClientConfig{
+					Cloud:    "AzurePublicCloud",
+					TenantID: "fakeId",
+				},
+				AzureAuthConfig: azclient.AzureAuthConfig{
+					UseFederatedWorkloadIdentityExtension: true,
 				},
 				SubscriptionID: "fakeId",
 			},
@@ -1092,7 +1198,7 @@ func compareStructFields(t *testing.T, v1, v2 reflect.Value) bool {
 		field2 := v2.Field(i)
 		fieldType := v1.Type().Field(i)
 
-		if reflect.DeepEqual(field1.Interface(), reflect.Zero(field1.Type()).Interface()) {
+		if field1.IsZero() || reflect.DeepEqual(field1.Interface(), reflect.Zero(field1.Type()).Interface()) {
 			continue // Skip zero value fields in struct1
 		}
 

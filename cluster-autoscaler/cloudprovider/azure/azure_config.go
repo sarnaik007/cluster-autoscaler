@@ -54,6 +54,9 @@ type Config struct {
 	// Azure cloud provider configuration, which is generally shared with other Azure components.
 	providerazure.Config `json:",inline" yaml:",inline"`
 
+	// Legacy fields, which are only here for backward compatibility. To be deprecated.
+	legacyConfig `json:",inline" yaml:",inline"`
+
 	ClusterName string `json:"clusterName" yaml:"clusterName"`
 	// ClusterResourceGroup is the resource group where the cluster is located.
 	ClusterResourceGroup string `json:"clusterResourceGroup" yaml:"clusterResourceGroup"`
@@ -87,6 +90,18 @@ type Config struct {
 	EnableDynamicInstanceList bool `json:"enableDynamicInstanceList,omitempty" yaml:"enableDynamicInstanceList,omitempty"`
 }
 
+// These are only here for backward compabitility. Their equivalent exists in providerazure.Config with a different name.
+type legacyConfig struct {
+	// Being renamed to UseFederatedWorkloadIdentityExtension
+	UseWorkloadIdentityExtension *bool `json:"useWorkloadIdentityExtension" yaml:"useWorkloadIdentityExtension"`
+	// VMSS metadata cache TTL in seconds, only applies for vmss type; being renamed to VmssCacheTTLInSeconds
+	VmssCacheTTL *int64 `json:"vmssCacheTTL" yaml:"vmssCacheTTL"`
+	// VMSS instances cache TTL in seconds, only applies for vmss type; being renamed to VmssVirtualMachinesCacheTTLInSeconds
+	VmssVmsCacheTTL *int64 `json:"vmssVmsCacheTTL" yaml:"vmssVmsCacheTTL"`
+	// EnableVmssFlex defines whether to enable Vmss Flex support or not; being renamed to EnableVmssFlexNodes
+	EnableVmssFlex *bool `json:"enableVmssFlex,omitempty" yaml:"enableVmssFlex,omitempty"`
+}
+
 // BuildAzureConfig returns a Config object for the Azure clients
 func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 	var err error
@@ -112,6 +127,26 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal config body: %v", err)
 		}
+	}
+
+	// Legacy config fields, take precedence if provided.
+	if cfg.UseWorkloadIdentityExtension != nil {
+		cfg.UseFederatedWorkloadIdentityExtension = *cfg.UseWorkloadIdentityExtension
+	}
+	if cfg.VmssCacheTTL != nil {
+		if *cfg.VmssCacheTTL > int64(^uint32(0)) {
+			return nil, fmt.Errorf("VmssCacheTTL value %d is too large", *cfg.VmssCacheTTL)
+		}
+		cfg.VmssCacheTTLInSeconds = int(*cfg.VmssCacheTTL)
+	}
+	if cfg.VmssVmsCacheTTL != nil {
+		if *cfg.VmssVmsCacheTTL > int64(^uint32(0)) {
+			return nil, fmt.Errorf("VmssVmsCacheTTL value %d is too large", *cfg.VmssVmsCacheTTL)
+		}
+		cfg.VmssVirtualMachinesCacheTTLInSeconds = int(*cfg.VmssVmsCacheTTL)
+	}
+	if cfg.EnableVmssFlex != nil {
+		cfg.EnableVmssFlexNodes = *cfg.EnableVmssFlex
 	}
 
 	// Each of these environment variables, if provided, will override what's in the config file.
