@@ -172,13 +172,13 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 	if _, err = assignFromEnvIfExists(&cfg.TenantID, "ARM_TENANT_ID"); err != nil {
 		return nil, err
 	}
-	if _, err = assignFromEnvIfExists(&cfg.TenantID, "AZURE_TENANT_ID"); err != nil {
+	if _, err = assignFromEnvIfExists(&cfg.TenantID, "AZURE_TENANT_ID"); err != nil { // taking precedence
 		return nil, err
 	}
 	if _, err = assignFromEnvIfExists(&cfg.AADClientID, "ARM_CLIENT_ID"); err != nil {
 		return nil, err
 	}
-	if _, err = assignFromEnvIfExists(&cfg.AADClientID, "AZURE_CLIENT_ID"); err != nil {
+	if _, err = assignFromEnvIfExists(&cfg.AADClientID, "AZURE_CLIENT_ID"); err != nil { // taking precedence
 		return nil, err
 	}
 	if _, err = assignFromEnvIfExists(&cfg.AADFederatedTokenFile, "AZURE_FEDERATED_TOKEN_FILE"); err != nil {
@@ -205,16 +205,25 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 	if _, err = assignBoolFromEnvIfExists(&cfg.UseManagedIdentityExtension, "ARM_USE_MANAGED_IDENTITY_EXTENSION"); err != nil {
 		return nil, err
 	}
-	if _, err = assignBoolFromEnvIfExists(&cfg.UseFederatedWorkloadIdentityExtension, "ARM_USE_WORKLOAD_IDENTITY_EXTENSION"); err != nil {
+	if _, err = assignBoolFromEnvIfExists(&cfg.UseFederatedWorkloadIdentityExtension, "ARM_USE_FEDERATED_WORKLOAD_IDENTITY_EXTENSION"); err != nil {
+		return nil, err
+	}
+	if _, err = assignBoolFromEnvIfExists(&cfg.UseFederatedWorkloadIdentityExtension, "ARM_USE_WORKLOAD_IDENTITY_EXTENSION"); err != nil { // taking precedence
 		return nil, err
 	}
 	if _, err = assignFromEnvIfExists(&cfg.UserAssignedIdentityID, "ARM_USER_ASSIGNED_IDENTITY_ID"); err != nil {
 		return nil, err
 	}
-	if _, err = assignIntFromEnvIfExists(&cfg.VmssCacheTTLInSeconds, "AZURE_VMSS_CACHE_TTL"); err != nil {
+	if _, err = assignIntFromEnvIfExists(&cfg.VmssCacheTTLInSeconds, "AZURE_VMSS_CACHE_TTL_IN_SECONDS"); err != nil {
 		return nil, err
 	}
-	if _, err = assignIntFromEnvIfExists(&cfg.VmssVirtualMachinesCacheTTLInSeconds, "AZURE_VMSS_VMS_CACHE_TTL"); err != nil {
+	if _, err = assignIntFromEnvIfExists(&cfg.VmssCacheTTLInSeconds, "AZURE_VMSS_CACHE_TTL"); err != nil { // taking precedence
+		return nil, err
+	}
+	if _, err = assignIntFromEnvIfExists(&cfg.VmssVirtualMachinesCacheTTLInSeconds, "AZURE_VMSS_VMS_CACHE_TTL_IN_SECONDS"); err != nil {
+		return nil, err
+	}
+	if _, err = assignIntFromEnvIfExists(&cfg.VmssVirtualMachinesCacheTTLInSeconds, "AZURE_VMSS_VMS_CACHE_TTL"); err != nil { // taking precedence
 		return nil, err
 	}
 	if _, err = assignIntFromEnvIfExists(&cfg.VmssVmsCacheJitter, "AZURE_VMSS_VMS_CACHE_JITTER"); err != nil {
@@ -232,7 +241,10 @@ func BuildAzureConfig(configReader io.Reader) (*Config, error) {
 	if _, err = assignBoolFromEnvIfExists(&cfg.EnableDynamicInstanceList, "AZURE_ENABLE_DYNAMIC_INSTANCE_LIST"); err != nil {
 		return nil, err
 	}
-	if _, err = assignBoolFromEnvIfExists(&cfg.EnableVmssFlexNodes, "AZURE_ENABLE_VMSS_FLEX"); err != nil {
+	if _, err = assignBoolFromEnvIfExists(&cfg.EnableVmssFlexNodes, "AZURE_ENABLE_VMSS_FLEX_NODES"); err != nil {
+		return nil, err
+	}
+	if _, err = assignBoolFromEnvIfExists(&cfg.EnableVmssFlexNodes, "AZURE_ENABLE_VMSS_FLEX"); err != nil { // taking precedence
 		return nil, err
 	}
 	if cfg.CloudProviderBackoff {
