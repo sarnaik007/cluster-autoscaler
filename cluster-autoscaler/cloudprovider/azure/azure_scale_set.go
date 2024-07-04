@@ -247,8 +247,8 @@ func (scaleSet *ScaleSet) getCurSize() (int64, error) {
 	return scaleSet.curSize, nil
 }
 
-// getScaleSetSize gets Scale Set size.
-func (scaleSet *ScaleSet) getScaleSetSize() (int64, error) {
+// GetScaleSetSize gets Scale Set size.
+func (scaleSet *ScaleSet) GetScaleSetSize() (int64, error) {
 	// First, get the size of the ScaleSet reported by API
 	// -1 indiciates the ScaleSet hasn't been initialized
 	size, err := scaleSet.getCurSize()
@@ -289,8 +289,8 @@ func (scaleSet *ScaleSet) waitForCreateOrUpdateInstances(future *azure.Future) {
 	klog.Errorf("waitForCreateOrUpdateInstances(%s) failed, err: %v", scaleSet.Name, err)
 }
 
-// setScaleSetSize sets ScaleSet size.
-func (scaleSet *ScaleSet) setScaleSetSize(size int64, delta int) error {
+// SetScaleSetSize sets ScaleSet size.
+func (scaleSet *ScaleSet) SetScaleSetSize(size int64, delta int) error {
 	vmssInfo, err := scaleSet.getVMSSFromCache()
 	if err != nil {
 		klog.Errorf("Failed to get information for VMSS (%q): %v", scaleSet.Name, err)
@@ -316,7 +316,7 @@ func (scaleSet *ScaleSet) setScaleSetSize(size int64, delta int) error {
 // TargetSize returns the current TARGET size of the node group. It is possible that the
 // number is different from the number of nodes registered in Kubernetes.
 func (scaleSet *ScaleSet) TargetSize() (int, error) {
-	size, err := scaleSet.getScaleSetSize()
+	size, err := scaleSet.GetScaleSetSize()
 	return int(size), err
 }
 
@@ -326,7 +326,7 @@ func (scaleSet *ScaleSet) IncreaseSize(delta int) error {
 		return fmt.Errorf("size increase must be positive")
 	}
 
-	size, err := scaleSet.getScaleSetSize()
+	size, err := scaleSet.GetScaleSetSize()
 	if err != nil {
 		return err
 	}
@@ -339,7 +339,7 @@ func (scaleSet *ScaleSet) IncreaseSize(delta int) error {
 		return fmt.Errorf("size increase too large - desired:%d max:%d", int(size)+delta, scaleSet.MaxSize())
 	}
 
-	return scaleSet.setScaleSetSize(size+int64(delta), delta)
+	return scaleSet.SetScaleSetSize(size+int64(delta), delta)
 }
 
 // AtomicIncreaseSize is not implemented.
@@ -349,6 +349,7 @@ func (scaleSet *ScaleSet) AtomicIncreaseSize(delta int) error {
 
 // GetScaleSetVms returns list of nodes for the given scale set.
 func (scaleSet *ScaleSet) GetScaleSetVms() ([]compute.VirtualMachineScaleSetVM, *retry.Error) {
+	klog.V(4).Infof("GetScaleSetVms: starts")
 	ctx, cancel := getContextWithTimeout(vmssContextTimeout)
 	defer cancel()
 
@@ -406,7 +407,7 @@ func (scaleSet *ScaleSet) DecreaseTargetSize(delta int) error {
 	// VMSS size should be changed automatically after the Node deletion, hence this operation is not required.
 	// To prevent some unreproducible bugs, an extra refresh of cache is needed.
 	scaleSet.invalidateInstanceCache()
-	_, err := scaleSet.getScaleSetSize()
+	_, err := scaleSet.GetScaleSetSize()
 	if err != nil {
 		klog.Warningf("DecreaseTargetSize: failed with error: %v", err)
 	}
@@ -532,7 +533,9 @@ func (scaleSet *ScaleSet) DeleteInstances(instances []*azureRef, hasUnregistered
 	defer cancel()
 
 	future, rerr := scaleSet.deleteInstances(ctx, requiredIds, commonAsg.Id())
+
 	if rerr != nil {
+
 		klog.Errorf("virtualMachineScaleSetsClient.DeleteInstancesAsync for instances %v for %s failed: %+v", requiredIds.InstanceIds, scaleSet.Name, rerr)
 		return rerr.Error()
 	}
@@ -576,7 +579,7 @@ func (scaleSet *ScaleSet) waitForDeleteInstances(future *azure.Future, requiredI
 // DeleteNodes deletes the nodes from the group.
 func (scaleSet *ScaleSet) DeleteNodes(nodes []*apiv1.Node) error {
 	klog.V(8).Infof("Delete nodes requested: %q\n", nodes)
-	size, err := scaleSet.getScaleSetSize()
+	size, err := scaleSet.GetScaleSetSize()
 	if err != nil {
 		return err
 	}
@@ -585,11 +588,8 @@ func (scaleSet *ScaleSet) DeleteNodes(nodes []*apiv1.Node) error {
 		return fmt.Errorf("min size reached, nodes will not be deleted")
 	}
 
-	// Distinguish between unregistered node deletion and normal node deletion
 	refs := make([]*azureRef, 0, len(nodes))
 	hasUnregisteredNodes := false
-	unregisteredRefs := make([]*azureRef, 0, len(nodes))
-
 	for _, node := range nodes {
 		belongs, err := scaleSet.Belongs(node)
 		if err != nil {
@@ -606,18 +606,7 @@ func (scaleSet *ScaleSet) DeleteNodes(nodes []*apiv1.Node) error {
 		ref := &azureRef{
 			Name: node.Spec.ProviderID,
 		}
-
-		if node.Annotations[cloudprovider.FakeNodeReasonAnnotation] == cloudprovider.FakeNodeUnregistered {
-			klog.V(5).Infof("Node: %s type is unregistered..Appending to the unregistered list", node.Name)
-			unregisteredRefs = append(unregisteredRefs, ref)
-		} else {
-			refs = append(refs, ref)
-		}
-	}
-
-	if len(unregisteredRefs) > 0 {
-		klog.V(3).Infof("Removing unregisteredNodes: %v", unregisteredRefs)
-		return scaleSet.DeleteInstances(unregisteredRefs, true)
+		refs = append(refs, ref)
 	}
 
 	return scaleSet.DeleteInstances(refs, hasUnregisteredNodes)
@@ -653,6 +642,7 @@ func (scaleSet *ScaleSet) TemplateNodeInfo() (*schedulerframework.NodeInfo, erro
 
 // Nodes returns a list of all nodes that belong to this node group.
 func (scaleSet *ScaleSet) Nodes() ([]cloudprovider.Instance, error) {
+	klog.V(4).Infof("Nodes: starts, scaleSet.Name: %s", scaleSet.Name)
 	curSize, err := scaleSet.getCurSize()
 	if err != nil {
 		klog.Errorf("Failed to get current size for vmss %q: %v", scaleSet.Name, err)
