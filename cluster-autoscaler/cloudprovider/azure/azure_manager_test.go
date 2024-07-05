@@ -29,8 +29,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 	azclients "sigs.k8s.io/cloud-provider-azure/pkg/azureclients"
@@ -136,7 +136,9 @@ const validAzureCfgForStandardVMTypeWithoutDeploymentParameters = `{
         "deployment":"cluster-autoscaler-0001"
 }`
 
-const invalidAzureCfg = `{{}"cloud": "AzurePublicCloud",}`
+const (
+	invalidAzureCfg = `{{}"cloud": "AzurePublicCloud",}`
+)
 
 func TestCreateAzureManagerValidConfig(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -221,6 +223,7 @@ func TestCreateAzureManagerValidConfig(t *testing.T) {
 	assert.Equal(t, true, reflect.DeepEqual(*expectedConfig, *manager.config), "unexpected azure manager configuration")
 }
 
+// nolint: goconst
 func TestCreateAzureManagerValidConfigForStandardVMType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -601,7 +604,6 @@ func TestFetchExplicitNodeGroups(t *testing.T) {
 		manager.azClient.virtualMachineScaleSetsClient = mockVMSSClient
 
 		if orchMode == compute.Uniform {
-
 			mockVMSSVMClient := mockvmssvmclient.NewMockInterface(ctrl)
 			mockVMSSVMClient.EXPECT().List(gomock.Any(), manager.config.ResourceGroup, "test-asg", gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
 			manager.azClient.virtualMachineScaleSetVMsClient = mockVMSSVMClient
@@ -685,13 +687,14 @@ func TestGetFilteredAutoscalingGroupsVmss(t *testing.T) {
 		azureRef: azureRef{
 			Name: vmssName,
 		},
-		minSize:                minVal,
-		maxSize:                maxVal,
-		manager:                manager,
-		enableForceDelete:      manager.config.EnableForceDelete,
-		curSize:                3,
-		sizeRefreshPeriod:      manager.azureCache.refreshInterval,
-		instancesRefreshPeriod: defaultVmssInstancesRefreshPeriod,
+		minSize:                  minVal,
+		maxSize:                  maxVal,
+		manager:                  manager,
+		enableForceDelete:        manager.config.EnableForceDelete,
+		curSize:                  3,
+		sizeRefreshPeriod:        manager.azureCache.refreshInterval,
+		getVmssSizeRefreshPeriod: manager.azureCache.refreshInterval,
+		InstanceCache:            InstanceCache{instancesRefreshPeriod: defaultVmssInstancesRefreshPeriod},
 	}}
 	assert.True(t, assert.ObjectsAreEqualValues(expectedAsgs, asgs), "expected %#v, but found: %#v", expectedAsgs, asgs)
 }
@@ -732,13 +735,14 @@ func TestGetFilteredAutoscalingGroupsVmssWithConfiguredSizes(t *testing.T) {
 		azureRef: azureRef{
 			Name: vmssName,
 		},
-		minSize:                minVal,
-		maxSize:                maxVal,
-		manager:                manager,
-		enableForceDelete:      manager.config.EnableForceDelete,
-		curSize:                3,
-		sizeRefreshPeriod:      manager.azureCache.refreshInterval,
-		instancesRefreshPeriod: defaultVmssInstancesRefreshPeriod,
+		minSize:                  minVal,
+		maxSize:                  maxVal,
+		manager:                  manager,
+		enableForceDelete:        manager.config.EnableForceDelete,
+		curSize:                  3,
+		sizeRefreshPeriod:        manager.azureCache.refreshInterval,
+		getVmssSizeRefreshPeriod: manager.azureCache.refreshInterval,
+		InstanceCache:            InstanceCache{instancesRefreshPeriod: defaultVmssInstancesRefreshPeriod},
 	}}
 	assert.True(t, assert.ObjectsAreEqualValues(expectedAsgs, asgs), "expected %#v, but found: %#v", expectedAsgs, asgs)
 }
