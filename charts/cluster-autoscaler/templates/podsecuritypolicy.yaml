@@ -1,5 +1,5 @@
 {{- if .Values.rbac.pspEnabled }}
-apiVersion: {{ template "podsecuritypolicy.apiVersion" . }}
+apiVersion: policy/v1
 kind: PodSecurityPolicy
 metadata:
   name: {{ template "cluster-autoscaler.fullname" . }}
