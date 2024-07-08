@@ -11,8 +11,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2
-	k8s.io/client-go v0.30.1
-	k8s.io/component-base v0.30.1
+	k8s.io/client-go v0.30.2
+	k8s.io/component-base v0.30.2
 	k8s.io/klog/v2 v2.120.1
 )
 
